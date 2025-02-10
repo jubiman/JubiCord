@@ -1,0 +1,6 @@
+.env
+node_modules/
+config.db
+.idea/
+ssl/*.pem
+package-lock.json
