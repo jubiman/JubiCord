@@ -47,11 +47,6 @@ const db = new Database() // Create or open the database
 //         PRIMARY KEY (guildId, userId)
 //     )`);
 // });
-// Add default superuser to each guild the bot is in
-client.guilds.cache.forEach(guild => {
-    db.addSuperuser(guild.id, guild.ownerId).then(() => console.log(`Added ${guild.ownerId} as superuser for guild ${guild.id}`)).catch(console.error);
-    db.addSuperuser(guild.id, process.env.DEFAULT_SUPERUSER).then(() => console.log(`Added ${process.env.DEFAULT_SUPERUSER} as superuser for guild ${guild.id}`)).catch(console.error);
-});
 
 // On ready
 client.once('ready', async () => {
@@ -68,6 +63,12 @@ client.once('ready', async () => {
 
         console.log('Successfully reloaded application (/) commands globally.');
 
+        // Add default superuser to each guild the bot is in
+        console.log('Adding default superuser to each guild the bot is in...');
+        client.guilds.cache.forEach(guild => {
+            db.addSuperuser(guild.id, guild.ownerId).then(() => console.log(`Added ${guild.ownerId} as superuser for guild ${guild.id}`)).catch(console.error);
+            db.addSuperuser(guild.id, process.env.DEFAULT_SUPERUSER).then(() => console.log(`Added ${process.env.DEFAULT_SUPERUSER} as superuser for guild ${guild.id}`)).catch(console.error);
+        });
     } catch (error) {
         console.error(error);
     }
