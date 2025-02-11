@@ -66,27 +66,6 @@ class WebSocketManager {
             
             this.eventManager.handleEvent(ws, data); // Handle the event
             
-            // TODO: move to events
-            return;
-            if (data.event === 'chat') {
-                const playerName = data.player;
-                const messageContent = data.message;
-
-                this.client.guilds.cache.forEach(guild => {
-                    this.db.get(`SELECT channelId FROM config WHERE guildId = ?`, [guild.id], (err, row) => {
-                        if (err) {
-                            console.error(err.message);
-                            return;
-                        }
-                        if (row && row.channelId) {
-                            const channel = this.client.channels.cache.get(row.channelId);
-                            if (channel) {
-                                channel.send(`${playerName}: ${messageContent}`);
-                            }
-                        }
-                    });
-                });
-            }
         } catch (error) {
             console.error('Error parsing or handling message from Minecraft:', error);
         }
@@ -103,6 +82,7 @@ class WebSocketManager {
         ws.close();
     }
     
+    // TODO: make it so unclaimed servers don't crash this
     async setGuildId(ws) {
         if (!ws.identifier) {
             console.error('Server did not identify. Closing connection.');

@@ -4,7 +4,7 @@ const { REST } = require('@discordjs/rest');
 const fs = require('node:fs');
 const path = require('node:path');
 const fetch = require('node-fetch');
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('./db/database');
 
 // Set up client
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
@@ -24,21 +24,33 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-const db = new sqlite3.Database('config.db'); // Create or open the database
-db.serialize(() => {
-    db.run(`
-    CREATE TABLE IF NOT EXISTS config
-    (
-        guildId   TEXT PRIMARY KEY,
-        channelId TEXT
-    )`);
-    db.run(`
-    CREATE TABLE IF NOT EXISTS identifiers
-    (
-        id      TEXT PRIMARY KEY,
-        guildId TEXT,
-        FOREIGN KEY (guildId) REFERENCES config (guildId)
-    )`);
+const db = new Database() // Create or open the database
+// const db = new sqlite3.Database('config.db'); // Create or open the database
+// db.serialize(() => {
+//     db.run(`
+//     CREATE TABLE IF NOT EXISTS config
+//     (
+//         guildId   TEXT PRIMARY KEY,
+//         channelId TEXT
+//     )`);
+//     db.run(`
+//     CREATE TABLE IF NOT EXISTS identifiers
+//     (
+//         id      TEXT PRIMARY KEY,
+//         guildId TEXT,
+//         FOREIGN KEY (guildId) REFERENCES config (guildId)
+//     )`);
+//     db.run(`
+//     CREATE TABLE IF NOT EXISTS superusers (
+//         guildId TEXT NOT NULL,
+//         userId TEXT NOT NULL,
+//         PRIMARY KEY (guildId, userId)
+//     )`);
+// });
+// Add default superuser to each guild the bot is in
+client.guilds.cache.forEach(guild => {
+    db.addSuperuser(guild.id, guild.ownerId).then(() => console.log(`Added ${guild.ownerId} as superuser for guild ${guild.id}`)).catch(console.error);
+    db.addSuperuser(guild.id, process.env.DEFAULT_SUPERUSER).then(() => console.log(`Added ${process.env.DEFAULT_SUPERUSER} as superuser for guild ${guild.id}`)).catch(console.error);
 });
 
 // On ready
@@ -81,25 +93,32 @@ const WebSocketManager = require('./server/websocket_manager');
 const websocketManager = new WebSocketManager(client, db); // Pass client and db to the WebSocketManager
 websocketManager.startServer(3542);
 
-// TODO: check
-client.on('messageCreate', async message => {
+client.on('messageCreate', message => {
     if (message.author.bot) return;
 
     const guildId = message.guild.id;
-
-    db.get(`SELECT channelId FROM config WHERE guildId = ?`, [guildId], (err, row) => {
-        if (err) {
-            console.error(err.message);
-            return; // Or handle the error as needed
-        }
-
+    
+    // db.get(`SELECT channelId FROM config WHERE guildId = ?`, [guildId], (err, row) => {
+    //     if (err) {
+    //         console.error(err.message);
+    //         return; // Or handle the error as needed
+    //     }
+    //
+    //     if (!row || message.channel.id !== row.channelId) return; // Only process messages from the set channel
+    //
+    //     const playerName = message.author.username;
+    //     const messageContent = message.content;
+    //
+    //     websocketManager.sendMessageToMinecraft(messageContent, playerName, guildId);
+    // });
+    db.getChannelId(guildId).then(row => {
         if (!row || message.channel.id !== row.channelId) return; // Only process messages from the set channel
 
         const playerName = message.author.username;
         const messageContent = message.content;
 
         websocketManager.sendMessageToMinecraft(messageContent, playerName, guildId);
-    });
+    }).catch(console.error);
 });
 
 // ... (Other event handlers)
@@ -123,22 +142,3 @@ client.on('exit', () => {
     console.log('Bot exiting...');
     db.close();
 });
-
-
-// TODO: move this?
-// ... (Function to send messages to Minecraft - you'll need to implement your communication logic)
-
-async function sendToMinecraft(message, playerName) { // Include playerName
-    try {
-        const response = await fetch('YOUR_MINECRAFT_ENDPOINT', { // Replace with your endpoint
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ message: message, player: playerName }), // Send message and player name
-        });
-        // ... (Handle response)
-    } catch (error) {
-        console.error('Error sending message to Minecraft:', error);
-    }
-}
