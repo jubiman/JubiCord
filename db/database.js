@@ -46,9 +46,9 @@ class Database {
         });
     }
 
-    async getIdentifier(guildId, id) {
+    async getIdentifier(guildId) {
         return new Promise((resolve, reject) => {
-            this.db.get('SELECT id FROM identifiers WHERE guildId = ? AND id = ?', [guildId, id], (err, row) => {
+            this.db.get('SELECT id FROM identifiers WHERE guildId = ?', [guildId], (err, row) => {
                 if (err) reject(err);
                 resolve(row ? row.id : null);
             });
@@ -96,6 +96,15 @@ class Database {
             this.db.run('DELETE FROM superusers WHERE guildId = ? AND userId = ?', [guildId, userId], (err) => {
                 if (err) reject(err);
                 resolve();
+            });
+        });
+    }
+    
+    async getSuperusers(guildId) {
+        return new Promise((resolve, reject) => {
+            this.db.all('SELECT userId FROM superusers WHERE guildId = ?', [guildId], (err, rows) => {
+                if (err) reject(err);
+                resolve(rows.map(row => row.userId));
             });
         });
     }
