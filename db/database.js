@@ -84,7 +84,7 @@ class Database {
 
     async addSuperuser(guildId, userId) {
         return new Promise((resolve, reject) => {
-            this.db.run('INSERT INTO superusers (guildId, userId) VALUES (?, ?)', [guildId, userId], (err) => {
+            this.db.run('INSERT OR REPLACE INTO superusers (guildId, userId) VALUES (?, ?)', [guildId, userId], (err) => {
                 if (err) reject(err);
                 resolve();
             });
