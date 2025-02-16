@@ -1,0 +1,4 @@
+{
+    "API_URL": "http://localhost:3000/api/jubicord/v1",
+    "DEFAULT_SUPERUSER": "151990643684540416"
+}

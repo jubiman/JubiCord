@@ -3,8 +3,8 @@ const { Client, GatewayIntentBits, Routes, Collection } = require('discord.js');
 const { REST } = require('@discordjs/rest');
 const fs = require('node:fs');
 const path = require('node:path');
-const fetch = require('node-fetch');
-const Database = require('./db/database');
+const api = require('./server/apiwrapper');
+const config = require('./config.json');
 
 // Set up client
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
@@ -24,30 +24,6 @@ for (const file of commandFiles) {
     client.commands.set(command.data.name, command);
 }
 
-const db = new Database() // Create or open the database
-// const db = new sqlite3.Database('config.db'); // Create or open the database
-// db.serialize(() => {
-//     db.run(`
-//     CREATE TABLE IF NOT EXISTS config
-//     (
-//         guildId   TEXT PRIMARY KEY,
-//         channelId TEXT
-//     )`);
-//     db.run(`
-//     CREATE TABLE IF NOT EXISTS identifiers
-//     (
-//         id      TEXT PRIMARY KEY,
-//         guildId TEXT,
-//         FOREIGN KEY (guildId) REFERENCES config (guildId)
-//     )`);
-//     db.run(`
-//     CREATE TABLE IF NOT EXISTS superusers (
-//         guildId TEXT NOT NULL,
-//         userId TEXT NOT NULL,
-//         PRIMARY KEY (guildId, userId)
-//     )`);
-// });
-
 // On ready
 client.once('ready', async () => {
     console.log('Bot is ready!');
@@ -66,8 +42,8 @@ client.once('ready', async () => {
         // Add default superuser to each guild the bot is in
         console.log('Adding default superuser to each guild the bot is in...');
         client.guilds.cache.forEach(guild => {
-            db.addSuperuser(guild.id, guild.ownerId).then(() => console.log(`Added ${guild.ownerId} as superuser for guild ${guild.id}`)).catch(console.error);
-            db.addSuperuser(guild.id, process.env.DEFAULT_SUPERUSER).then(() => console.log(`Added ${process.env.DEFAULT_SUPERUSER} as superuser for guild ${guild.id}`)).catch(console.error);
+            addSuperusers(guild);
+            api.createGuild(guild.id, guild.name, guild.icon).then(() => console.log(`Created guild ${guild.id}`)).catch(console.error);
         });
     } catch (error) {
         console.error(error);
@@ -83,7 +59,7 @@ client.on('interactionCreate', async interaction => {
     if (!command) return;
 
     try {
-        await command.execute(interaction, db); // Execute the command
+        await command.execute(interaction); // Execute the command
     } catch (error) {
         console.error(error);
         await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
@@ -91,7 +67,7 @@ client.on('interactionCreate', async interaction => {
 });
 
 const WebSocketManager = require('./server/websocket_manager');
-const websocketManager = new WebSocketManager(client, db); // Pass client and db to the WebSocketManager
+const websocketManager = new WebSocketManager(client); // Pass client to the WebSocketManager
 websocketManager.startServer(3542);
 
 client.on('messageCreate', message => {
@@ -99,21 +75,8 @@ client.on('messageCreate', message => {
 
     const guildId = message.guild.id;
     
-    // db.get(`SELECT channelId FROM config WHERE guildId = ?`, [guildId], (err, row) => {
-    //     if (err) {
-    //         console.error(err.message);
-    //         return; // Or handle the error as needed
-    //     }
-    //
-    //     if (!row || message.channel.id !== row.channelId) return; // Only process messages from the set channel
-    //
-    //     const playerName = message.author.username;
-    //     const messageContent = message.content;
-    //
-    //     websocketManager.sendMessageToMinecraft(messageContent, playerName, guildId);
-    // });
-    db.getChannelId(guildId).then(row => {
-        if (!row || message.channel.id !== row.channelId) return; // Only process messages from the set channel
+    api.getChannelId(guildId).then(channelId => {
+        if (!channelId || message.channel.id !== channelId) return; // Only process messages from the set channel
 
         const playerName = message.author.username;
         const messageContent = message.content;
@@ -122,7 +85,29 @@ client.on('messageCreate', message => {
     }).catch(console.error);
 });
 
-// ... (Other event handlers)
+client.on('guildCreate', guild => {
+    api.createGuild(guild.id, guild.name, guild.icon).then(() => console.log(`Created guild ${guild.id}`)).catch(console.error);
+    addSuperusers(guild.id);
+});
+
+function addSuperusers(guild) {
+    api.addSuperuser(guild.id, guild.ownerId).then((data) => {
+        if (data.error) {
+            if (data.error.errno === 19) return; // Ignore duplicate entry error
+            console.error(`Error adding superuser: ${data.error.message || data.error.code}`);
+            return;
+        }
+        console.log(`Added ${guild.ownerId} as superuser for guild ${guild.id}`)
+    }).catch(console.error);
+    api.addSuperuser(guild.id, config.DEFAULT_SUPERUSER).then((data) => {
+        if (data.error) {
+            if (data.error.errno === 19) return; // Ignore duplicate entry error
+            console.error(`Error adding superuser: ${data.error.message || data.error.code}`);
+            return;
+        }
+        console.log(`Added ${config.DEFAULT_SUPERUSER} as superuser for guild ${guild.id}`)
+    }).catch(console.error);
+}
 
 client.login(token).then(r => console.log(`Logged in as ${client.user.tag}`)).catch(console.error);
 
@@ -130,16 +115,13 @@ client.login(token).then(r => console.log(`Logged in as ${client.user.tag}`)).ca
 // Make sure the database closes when the bot exits
 process.on('SIGINT', () => {
     console.log('Bot received SIGINT signal. Closing...');
-    db.close();
     process.exit();
 });
 
 client.on('error', err => {
     console.error('Bot error:', err);
-    db.close();
 });
 
 client.on('exit', () => {
     console.log('Bot exiting...');
-    db.close();
 });

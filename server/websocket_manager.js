@@ -3,16 +3,17 @@ const WebSocket = require('ws');
 const https = require('https');
 const fs = require('fs');
 const EventManager = require('./eventManager');
+const api = require('./apiwrapper');
+const constants = require("node:constants");
 
 class WebSocketManager {
-    constructor(client, db) { // Add client and db as parameters
+    constructor(client) { // Add client and db as parameters
         this.client = client;
-        this.db = db;
         this.ws = null;
         this.clients = new Set(); // Keep track of connected clients
         this.idToWs = new Map(); // Map identifiers to WebSocket objects
         this.guildIdToWs = new Map(); // Map guild IDs to WebSocket objects
-        
+
         // Register events from the events folder
         this.eventManager = new EventManager(this);
     }
@@ -30,9 +31,9 @@ class WebSocketManager {
         // });
 
         // this.ws = new WebSocket.Server({ server });
-        this.ws = new WebSocket.Server({ port });
+        this.ws = new WebSocket.Server({port});
         console.log(`WebSocket server listening on port ${port} (SSL/TLS)`);
-        
+
         // server.listen(port, () => {
         //     console.log(`WebSocket server listening on port ${port} (SSL/TLS)`);
         // });
@@ -40,9 +41,9 @@ class WebSocketManager {
         this.ws.on('connection', conn => {
             console.log(`Received connection from Minecraft client`);
             this.clients.add(conn); // Add client to the set
-            
+
             // Send them an identify packet
-            conn.send(JSON.stringify({ event: 'identify' }));
+            conn.send(JSON.stringify({event: 'identify'}));
 
             conn.on('message', message => {
                 this.handleMessage(conn, message);
@@ -63,9 +64,7 @@ class WebSocketManager {
     handleMessage(ws, message) {
         try {
             const data = JSON.parse(message);
-            
-            this.eventManager.handleEvent(ws, data); // Handle the event
-            
+            this.eventManager.handleEvent(ws, data);
         } catch (error) {
             console.error('Error parsing or handling message from Minecraft:', error);
         }
@@ -76,12 +75,12 @@ class WebSocketManager {
         this.idToWs.delete(ws.identifier);
         this.guildIdToWs.delete(ws.guildId);
     }
-    
+
     close(ws) {
         this.cleanup(ws);
         ws.close();
     }
-    
+
     // TODO: make it so unclaimed servers don't crash this
     async setGuildId(ws) {
         if (!ws.identifier) {
@@ -89,41 +88,22 @@ class WebSocketManager {
             this.close(ws);
             return;
         }
-        const row = await new Promise((resolve, reject) => {
-            this.db.get(`SELECT guildId
-                        FROM identifiers
-                        WHERE id = ?`, [ws.identifier], (err, row) => {
-                if (err) {
-                    reject(err);
-                }
-                resolve(row);
-            });
-        });
-        ws.guildId = row.guildId;
-        this.guildIdToWs.set(ws.guildId, ws);
-        console.debug(`Set guildId to ${ws.guildId}`);
-    }
-    
-    async setChannelId(ws) {
-        if (!ws.guildId) {
-            await this.setGuildId(ws);
+
+        const guilds = await api.getGuildIdsFromIdentifier(ws.identifier);
+        if (guilds.length === 0) {
+            console.error('No guilds found for identifier. Closing connection.');
+            this.close(ws);
+            return;
         }
-        const row = await new Promise((resolve, reject) => {
-            this.db.get(`SELECT channelId
-                        FROM config
-                        WHERE guildId = ?`, [ws.guildId], (err, row) => {
-                if (err) {
-                    reject(err);
-                }
-                resolve(row);
-            });
-        });
-        ws.channelId = row.channelId;
-        console.debug(`Set channelId to ${ws.channelId}`);
+        ws.guildIds = guilds;
+        for (const guildId of ws.guildIds) {
+            this.guildIdToWs.set(guildId, ws);
+        }
+        console.debug(`Set guildIds to [${ws.guildIds.join(", ")}]`);
     }
-    
+
     sendMessageToMinecraft(message, username, guildId) {
-        this.guildIdToWs.get(guildId).send(JSON.stringify({ 
+        this.guildIdToWs.get(guildId).send(JSON.stringify({
             event: 'message',
             message,
             username
@@ -131,14 +111,9 @@ class WebSocketManager {
     }
 
     sendToServer(id, message, username, avatar) {
-        // get the channelId from the database
-        this.db.get(`SELECT channelId FROM config WHERE guildId = ?`, [id], (err, row) => {
-            if (err) {
-                console.error(err.message);
-                return;
-            }
-            if (row && row.channelId) {
-                const channel = this.client.channels.cache.get(row.channelId);
+        api.getChannelId(id).then(channelId => {
+            if (channelId) {
+                const channel = this.client.channels.cache.get(channelId);
                 if (channel) {
                     channel.fetchWebhooks().then(webhook => {
                         webhook = webhook.find(webhook => webhook.name === "JubiCord");
@@ -150,7 +125,7 @@ class WebSocketManager {
                     });
                 }
             }
-        });
+        }).catch(console.error);
     }
 }
 

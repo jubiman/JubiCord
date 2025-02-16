@@ -1,5 +1,6 @@
 const { EmbedBuilder} = require('discord.js');
-        
+const api = require('../apiwrapper');
+
 module.exports = {
     name: 'serverState',
     async handle(wsm, ws, data) {
@@ -12,19 +13,14 @@ module.exports = {
         if (!ws.guildId) {
             await wsm.setGuildId(ws);
         }
-        wsm.db.get(`SELECT channelId
-                    FROM config
-                    WHERE guildId = ?`, [ws.guildId], (err, row) => {
-            if (err) {
-                console.error(`Error getting channelId for guildId ${ws.guildId}: ${err.message}`);
-                return;
-            }
-            if (row && row.channelId) {
-                const channel = wsm.client.channels.cache.get(row.channelId);
+        
+        api.getChannelId(ws.guildId).then(channelId => {
+            if (channelId) {
+                const channel = wsm.client.channels.cache.get(channelId);
                 if (channel) {
                     channel.send({embeds: [embed]}).catch(console.error);
                 }
             }
-        });
+        }).catch(console.error);
     },
 };
