@@ -17,7 +17,6 @@ module.exports = {
         }
         
         // send an embed with the configuration
-        console.log(superusers);
         interaction.reply({
             content: `Configuration for guild ${guildId}`,
             embeds: [
