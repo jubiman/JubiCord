@@ -1,10 +1,4 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Routes, Collection } = require('discord.js');
-const { REST } = require('@discordjs/rest');
-const fs = require('node:fs');
-const path = require('node:path');
-const api = require('./server/apiwrapper');
-const config = require('./config.json');
 
 // Define the formatting function
 function formatMessage(level, ...args) {
@@ -23,6 +17,13 @@ const originalDebug = console.debug;
 console.debug = (...args) => {
     originalDebug(formatMessage('DEBUG', ...args));
 };
+
+const { Client, GatewayIntentBits, Routes, Collection } = require('discord.js');
+const { REST } = require('@discordjs/rest');
+const fs = require('node:fs');
+const path = require('node:path');
+const api = require('./server/apiwrapper');
+const config = require('./config.json');
 
 // Set up client
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
