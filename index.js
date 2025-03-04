@@ -6,6 +6,24 @@ const path = require('node:path');
 const api = require('./server/apiwrapper');
 const config = require('./config.json');
 
+// Define the formatting function
+function formatMessage(level, ...args) {
+    const timestamp = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    return `[${timestamp}] [${level}] ${args.join(' ')}`;
+}
+
+// Override console.log
+const originalLog = console.log;
+console.log = (...args) => {
+    originalLog(formatMessage('LOG', ...args));
+};
+
+// Override console.debug
+const originalDebug = console.debug;
+console.debug = (...args) => {
+    originalDebug(formatMessage('DEBUG', ...args));
+};
+
 // Set up client
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 const token = process.env.DISCORD_TOKEN;
