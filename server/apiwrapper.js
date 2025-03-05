@@ -116,6 +116,73 @@ class Apiwrapper {
         const data = await response.json();
         return data.superusers;
     }
+
+    async createUser(userId, username, avatarUrl) {
+        const url = `${this.url}/users/create`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                userId,
+                username,
+                avatarUrl
+            })
+        });
+        return response.json();
+    }
+
+    async updateUser(userId, username, avatarUrl) {
+        const url = `${this.url}/users/${userId}`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username,
+                avatarUrl
+            })
+        });
+        return response.json();
+    }
+
+    async deleteUser(userId) {
+        const url = `${this.url}/users/${userId}`;
+        const response = await fetch(url, {
+            method: 'DELETE'
+        });
+        return response.json();
+    }
+
+    async addMembers(guildId, members) {
+        const url = `${this.url}/guilds/${guildId}/members`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                members
+            })
+        });
+        return response.json();
+    }
+
+    async removeMembers(guildId, members) {
+        const url = `${this.url}/guilds/${guildId}/members`;
+        const response = await fetch(url, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                members
+            })
+        });
+        return response.json();
+    }
 }
 
 module.exports = new Apiwrapper();
