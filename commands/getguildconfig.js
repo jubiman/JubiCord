@@ -33,7 +33,7 @@ module.exports = {
                         },
                         {
                             name: 'Superusers',
-                            value: (Array.isArray(superusers) && superusers.map(userId => `<@${userId}>`).join('\n')) || 'None',
+                            value: (superusers.map(user => `<@${user.userId}>`).join('\n')) || 'None',
                         }
                     ],
                 },
